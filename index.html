@@ -841,23 +841,13 @@
 <h1 id="title">CRIPTA</h1>
           <p id="msg">Le orde ti aspettano. Sei pronto a scendere all'inferno?</p>
           <button id="go">INIZIA LA PARTITA</button>
+<div id="online"><button id="crea-stanza" class="btn">CREA STANZA ONLINE (MAX 4)</button><div class="riga" style="margin-top:8px"><input id="codice-stanza" placeholder="codice o link stanza" maxlength="120" style="flex:1;min-width:120px"><button id="entra-stanza" class="btn btn-secondary">ENTRA</button></div><div id="stanza-box" hidden><div id="stanza-info"></div><div class="riga"><input id="stanza-link" readonly><button id="copia-link" class="btn btn-secondary">COPIA</button></div><button id="esci-stanza" class="btn btn-secondary">ESCI</button></div></div>
           
           <details id="menu-settings">
             <summary>IMPOSTAZIONI E COMANDI</summary>
             <div class="settings-panel">
               <div class="settings-head"><h2>IMPOSTAZIONI</h2><button type="button" class="btn btn-secondary" id="chiudi-settings">CHIUDI ✕</button></div>
-          <div id="online">
-            <button class="btn btn-secondary" id="crea-stanza">🌐 GIOCA ONLINE · CREA STANZA (MAX 4)</button>
-            <div id="stanza-box" hidden>
-              <div id="stanza-info"></div>
-              <div class="riga">
-                <input id="stanza-link" readonly />
-                <button class="btn" id="copia-link">COPIA LINK</button>
-              </div>
-              <small>Manda questo link ai tuoi amici: chi lo apre entra nella tua stanza. I giocatori si vedono e possono colpirsi; mostri e ondate restano separati per ogni giocatore.</small>
-              <button class="btn btn-secondary" id="esci-stanza">ESCI DALLA STANZA</button>
-            </div>
-          </div>
+          
 
           <h2>Volume generale</h2>
           <div class="riga"><input id="volume-slider" type="range" min="0" max="100" value="70" /><span id="volume-val">70%</span></div>
@@ -3510,7 +3500,7 @@
           if (en.textContent !== tn) en.textContent = tn;
         }
 
-        function subisciDanno(d) {
+        function subisciDanno(d) { if (room && netDown) return;
           if (modalitaCiao) { salute = 100; return; }
           if (armatura > 0) {
             const ass = Math.min(armatura, Math.ceil(d * 0.5));
@@ -3621,6 +3611,7 @@
         }
 
         function iniziaOndata(n) {
+          if (room && netHost()) room.emit("wstart", { n });
           sOndata();
           wave = n;
           waveQueue = comporreOndata(n);
@@ -3999,7 +3990,7 @@
             bossJumpState:"idle", bossJumpCooldown:tipo==="boss"?4.5+Math.random()*2:0, bossJumpTimer:0, bossBurstState:"idle", bossBurstCooldown:tipo==="boss"?7+Math.random()*2:0, bossBurstTimer:0, burstMark:null, jumpMark:null, jumpX:0, jumpZ:0, jumpStartX:0, jumpStartZ:0, jumpStartY:0, cover: null, tCover: 0, flank: Math.random() < .5 ? -1 : 1, orbita: Math.random() < .5 ? -1 : 1, raffica: 0, tRaffica: 0, hit: false, lx: 0, lz: 1,
           };
           aggiornaBarraVita(nemicoObj);
-          nemici.push(nemicoObj); if (!nemicoObj.uid) nemicoObj.uid = ++uidNemico; if (room && !nemicoObj.sync) room.emit("spawn", { u: nemicoObj.uid, t: (nemicoObj.elite ? "e:" : "") + nemicoObj.tipo, x: nemicoObj.g.position.x, z: nemicoObj.g.position.z });
+          nemici.push(nemicoObj); if (!nemicoObj.uid) nemicoObj.uid = ++uidNemico; 
           if(nemicoObj.nuovo>=0){nemicoObj.ruolo="speciale";nInit(nemicoObj);}
           if(tipo==="cacciatore" && !cacciatorePresentato){cacciatorePresentato=true;mostraBanner("NUOVO NEMICO: CACCIATORE","Salta verso il cerchio rosso: spostati prima dell'impatto!",3.2);}
           if(nemicoObj.nuovo>=0&&!nuoviPresentati[zona]){nuoviPresentati[zona]=true;mostraBanner("NUOVO NEMICO: "+NOMI_NUOVI[zona],DESC_NUOVI[zona],3.6);}
@@ -4049,7 +4040,7 @@
         }
 
         function esplodiNemico(n) {
-          n.morto = true; if (room && n.uid && !n.sync) room.emit("die", { u: n.uid });
+          n.morto = true; if (room && n.uid && netHost()) room.emit("die", { u: n.uid });
           if (n.nuovo === 3 && !n.figlia && !modalitaCiao) nDividi(n);
           if(n.jumpMark){rimuoviSegnaleArea(n.jumpMark);n.jumpMark=null;}
           if(n.burstMark){rimuoviSegnaleArea(n.burstMark);n.burstMark=null;}
@@ -4069,7 +4060,7 @@
           } else liberaNemico(n);
           if (n.tipo !== "boss" && Math.random() < 0.2) generaPowerUpAt(posizione.x, posizione.z, Math.random() < 0.5 ? "ammo" : "armor");
           if (n.elite) { spawnParticelle(posizione, 0xffcc33, 26, 5, 0.12); generaPowerUpAt(posizione.x + 0.8, posizione.z, ["heal", "armor", "ammo"][Math.floor(Math.random() * 3)]); }
-          if (n.tipo === "boss") { if (room) room.emit("boss", {});
+          if (n.tipo === "boss") { 
             if (wave === 9) setTimeout(()=>{ if(stato === "play" && wave === 9) mostraVittoria(); }, 2200);
             bossAttivo = false;
             generaPowerUpAt(posizione.x, posizione.z, "heal");
@@ -4170,6 +4161,7 @@
           return best;
         }
         function colpisciGiocatoreDaNemico(dmg, shake) {
+          if (bersRem) return netHitRem(dmg);
           if (tDanno > 0) return false;
           tDanno = 0.8;
           subisciDanno(dmg); sDanno();
@@ -4177,7 +4169,8 @@
           aggiornaHud();
           $("hurt").style.opacity = 0.5;
           setTimeout(() => ($("hurt").style.opacity = 0), 120);
-          if (salute <= 0) {
+          if (salute <= 0 && room) netCaduto();
+          else if (salute <= 0) {
             stato = "over";
             document.exitPointerLock();
             mostraOverlay("SEI MORTO", `Punteggio finale: <b>${score}</b> | Ondata raggiunta: <b>${wave}</b>`, "CLICCA PER RIPROVARE");
@@ -4351,7 +4344,7 @@
           const velBase = (1.6 + Math.min(score / 300, 1.5)) * 1.06;
           let distMinima = 999;
           for (let i = nemici.length - 1; i >= 0; i--) {
-            const n = nemici[i], p = n.g.position;
+            const n = nemici[i], p = n.g.position; netPunta(n);
             if (n.empSlowTimer > 0) n.empSlowTimer = Math.max(0, n.empSlowTimer - dt);
             if (n.morto) { nemici.splice(i, 1); continue; }
             let tx = player.x, tz = player.z;
@@ -4471,7 +4464,7 @@
             }
             const dannoContatto = n.tipo === "boss" ? 20 : 9;
             const raggioContatto = n.tipo === "boss" ? 1.6 : 1.1;
-            if (dPlayer < raggioContatto && tDanno <= 0) {
+            if (bersRem && dPlayer < raggioContatto) { netHitRem(dannoContatto); } else if (dPlayer < raggioContatto && tDanno <= 0) {
               tDanno = 0.8;
               subisciDanno(dannoContatto);
               sDanno();
@@ -4729,7 +4722,7 @@
           if (nemicoObj.morto) return;
           if (!modalitaCiao && nemicoObj.nuovo >= 0) { danno = nDannoMostro(nemicoObj, danno); if (danno <= 0) return; }
           if (modalitaCiao) danno = Math.max(danno, (nemicoObj.hp || 1) + 999999);
-          nemicoObj.hp -= danno; if (room && nemicoObj.uid && !nemicoObj.sync) room.emit("dmg", { u: nemicoObj.uid, d: danno });
+          nemicoObj.hp -= danno; if (room && nemicoObj.uid && !netHost()) room.emit("dmg", { u: nemicoObj.uid, d: danno });
           reagisciAlColpo(nemicoObj, danno);
           sHit();
           spawnParticelle(nemicoObj.g.position.clone().add(new THREE.Vector3(0, 1, 0)), nemicoObj.tipo === "slime" ? 0x33cc22 : 0x8a0000, 6, 3, 0.07);
@@ -4769,7 +4762,7 @@
 
         let lockOk = false, pausaSync = false;
         function pausa() {
-          stato = "menu"; if (room && !pausaSync) room.emit("pausa", {});
+          stato = "menu";
           mostraOverlay("PAUSA", "Clicca per riprendere la partita.", "RIPRENDI");
         }
 
@@ -5551,7 +5544,7 @@ function aggiornaSpeciali(dt){
               calcolaBfs();
             }
 
-            if (waveIntermission) {
+            if (room && !netHost()) { aggiornaWaveHud(); } else if (waveIntermission) {
               if (waveTimer !== Infinity) waveTimer -= dt;
               aggiornaWaveHud();
               if (waveTimer <= 0) iniziaOndata(wave + 1);
@@ -5574,6 +5567,7 @@ function aggiornaSpeciali(dt){
                   palleFuoco.forEach(p => {scene.remove(p.mesh); }); palleFuoco.length=0;
                   calcolaBfs();
                 }
+                if (room) room.emit("wend", { w: wave });
                 const bonus = 50 + wave * 15;
                 score += bonus;
                 const fineStoria = wave === 9;
@@ -5582,7 +5576,7 @@ function aggiornaSpeciali(dt){
                 aggiornaWaveHud();
               }
             }
-            aggiornaNemici(dt); aggiornaSpeciali(dt);
+            if (room && !netHost()) netClienteNemici(dt); else { aggiornaNemici(dt); aggiornaSpeciali(dt); }
             aggiornaNpc();
             tMinimappa -= dt;
             if (tMinimappa <= 0) { disegnaMinimappa(); tMinimappa = 0.12; }
@@ -5662,7 +5656,9 @@ function aggiornaSpeciali(dt){
 
         // ============ ONLINE (room) ============
         const altri = new Map();
-        let room = null, miaPeer = null, tNet = 0, netHudEl = null;
+        let room = null, miaPeer = null, tNet = 0, tNet2 = 0, netHudEl = null, hostId = null, bersRem = null, salvato = null, netDown = false, netRank = 0, tFocus = 0, focusId = null;
+        const T0 = Date.now(), cdHit = {}, MAX_GIOC = 4;
+        const netHost = () => !!room && !!miaPeer && hostId === miaPeer;
         function creaAvatar(id) {
           let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) % 360;
           const g = new THREE.Group(), m = new THREE.MeshLambertMaterial({ color: new THREE.Color(`hsl(${h},70%,45%)`) });
@@ -5677,43 +5673,90 @@ function aggiornaSpeciali(dt){
           g.add(corpo, testa, arma, gamb); scene.add(g);
           return { g, corpo, testa, t: null };
         }
-        function netHud() {
-          if (!netHudEl) {
-            netHudEl = document.createElement("div");
-            netHudEl.style.cssText = "position:fixed;left:20px;bottom:16px;z-index:10;font-size:12px;color:#39d6ff;background:#000a;padding:4px 8px;border:1px solid #39d6ff;pointer-events:none";
-            root.appendChild(netHudEl);
-          }
-          netHudEl.textContent = room ? "ONLINE: " + ((room.peerCount ? room.peerCount() : altri.size) + 1) + " giocatori" : "OFFLINE (modalità giocatore singolo)";
+        function netHud() { return; }
+        function netCaduto() {
+          if (netDown) return; netDown = true; salute = 0; aggiornaHud();
+          mostraBanner("SEI CADUTO", "Rinasci tra 6 secondi", 3);
+          setTimeout(() => { salute = 60; netDown = false; aggiornaHud(); }, 6000);
+        }
+        function netHitRem(d) {
+          const t = performance.now();
+          if (!room || !bersRem || (cdHit[bersRem] || 0) > t) return false;
+          cdHit[bersRem] = t + 800; room.emit("hit", { to: bersRem, d }); return true;
+        }
+        function netRipristina() { if (salvato) { player.x = salvato.x; player.z = salvato.z; salvato = null; } bersRem = null; }
+        function netPunta(n) {
+          netRipristina();
+          if (!room || !altri.size) return;
+          const p = n.g.position; let best = null, bd = (stato !== "over" && !netDown && salute > 0) ? Math.hypot(player.x - p.x, player.z - p.z) : 1e9;
+          altri.forEach((a, id) => { if (!a.t || a.hp <= 0) return; const d = Math.hypot(a.g.position.x - p.x, a.g.position.z - p.z); if (d < bd) { bd = d; best = id; } });
+          if (best) { const a = altri.get(best); salvato = { x: player.x, z: player.z }; player.x = a.g.position.x; player.z = a.g.position.z; bersRem = best; }
+        }
+        {
+          const aggOrig = aggiornaNemici;
+          aggiornaNemici = function (dt) { try { aggOrig(dt); } finally { netRipristina(); } };
+          const bfsOrig = calcolaBfs;
+          calcolaBfs = function () {
+            if (!netHost() || !altri.size) return bfsOrig();
+            if (performance.now() > tFocus) {
+              tFocus = performance.now() + 4000;
+              const ids = [null]; altri.forEach((a, id) => { if (a.hp > 0) ids.push(id); });
+              focusId = ids[Math.floor(Math.random() * ids.length)];
+            }
+            const a = focusId && altri.get(focusId);
+            if (!a) return bfsOrig();
+            const sx = player.x, sz = player.z; player.x = a.g.position.x; player.z = a.g.position.z;
+            try { bfsOrig(); } finally { player.x = sx; player.z = sz; }
+          };
         }
         function syncPeers(peers) {
-          const vivi = new Set();
+          const me = peers.find((p) => p.isMe); if (me) miaPeer = me.peer;
+          const ord = peers.filter((p) => p.presence && typeof p.presence.t0 === "number")
+            .sort((x, y) => x.presence.t0 - y.presence.t0 || (x.peer < y.peer ? -1 : 1));
+          const nuovoHost = ord.length ? ord[0].peer : null;
+          if (nuovoHost === miaPeer && hostId !== miaPeer) uidNemico = Math.max(uidNemico, ...nemici.map((n) => n.uid || 0)) + 1;
+          hostId = nuovoHost;
+          const rank = ord.findIndex((p) => p.isMe); netRank = Math.max(0, rank);
+          if (rank >= MAX_GIOC) { esciDaStanza("<b>La stanza è piena</b> (massimo 4 giocatori)."); return; }
+          const attivi = new Set(ord.slice(0, MAX_GIOC).map((p) => p.peer));
           peers.forEach((p) => {
-            if (p.isMe) { miaPeer = p.peer; return; }
-            const s = (typeof (p.presence||{}).x === "number") ? p.presence : { x: startX, z: startZ, yaw: 0 };
-            vivi.add(p.peer);
+            if (p.isMe || !attivi.has(p.peer)) return;
+            const s = p.presence || {};
             let a = altri.get(p.peer);
-            if (!a) { a = creaAvatar(p.peer); a.g.position.set(s.x, 0, s.z); altri.set(p.peer, a); }
-            a.t = { x: s.x, z: s.z, yaw: s.yaw || 0 };
+            if (!a) { a = creaAvatar(p.peer); a.g.position.set(typeof s.x === "number" ? s.x : startX, 0, typeof s.z === "number" ? s.z : startZ); altri.set(p.peer, a); }
+            if (typeof s.x === "number") a.t = { x: s.x, z: s.z, yaw: s.yaw || 0 };
+            a.hp = typeof s.hp === "number" ? s.hp : 100; a.g.visible = a.hp > 0;
           });
-          for (const [id, a] of altri) if (!vivi.has(id)) { scene.remove(a.g); altri.delete(id); }
-          netHud();
+          for (const [id, a] of altri) if (!attivi.has(id) || !peers.some((p) => p.peer === id)) { scene.remove(a.g); altri.delete(id); }
         }
-        function morteOnline(killer) {
-          stato = "over"; document.exitPointerLock();
-          mostraOverlay("SEI MORTO", `Ucciso da un altro giocatore | Punteggio: <b>${score}</b>`, "CLICCA PER RIPROVARE");
-          if (room) room.emit("kill", { by: killer, to: miaPeer });
+        function pvpSparo() { if (room) room.emit("shot", { x: player.x, z: player.z }); }
+        function netClienteNemici(dt) {
+          aggiornaVelGiocatore(dt);
+          const now = performance.now(), k = Math.min(1, dt * 12);
+          for (let i = nemici.length - 1; i >= 0; i--) {
+            const n = nemici[i];
+            if (n.morto) { nemici.splice(i, 1); continue; }
+            if (!n.nt) continue;
+            if (now - n.visto > 1500) { n.sync = true; esplodiNemico(n); continue; }
+            const p = n.g.position; p.x += (n.nt.x - p.x) * k; p.z += (n.nt.z - p.z) * k; n.g.rotation.y = n.nt.r;
+          }
         }
-        function pvpSparo() {
-          if (!room) return;
-          room.emit("shot", { x: player.x, z: player.z });
-          const bers = []; altri.forEach((a) => bers.push(a.corpo, a.testa));
-          if (!bers.length) return;
-          ray.setFromCamera({ x: 0, y: 0 }, camera); ray.far = 45;
-          const hP = ray.intersectObjects(bers, false)[0], hM = colpisciMuro(ray);
-          if (hP && (!hM || hP.distance < hM.distance)) {
-            const base = [30, 0, 18, 60, 90][armaCorr] || 20, hs = hP.object.userData.testa;
-            sHit(); spawnParticelle(hP.point, 0xaa0000, 8, 3, 0.07);
-            room.emit("hit", { to: hP.object.userData.peer, d: hs ? base * 2 : base, by: miaPeer });
+        function netRiceviPos(d) {
+          if (!d || !Array.isArray(d.e)) return;
+          if (typeof d.z === "number" && d.z !== zonaSbloccata) { zonaSbloccata = d.z; calcolaBfs(); }
+          if (typeof d.w === "number" && d.w !== wave) { wave = d.w; }
+          waveIntermission = !!d.i; waveQueue = []; aggiornaWaveHud();
+          const now = performance.now();
+          for (const [u, x, z, r, t, hp] of d.e) {
+            let n = nemici.find((q) => q.uid === u);
+            if (!n) {
+              if (typeof t !== "string") continue;
+              n = generaNemicoDiTipo(t); if (!n) continue;
+              n.sync = true; n.uid = u; n.g.position.set(x, 0, z);
+            }
+            if (n.morto) continue;
+            n.nt = { x, z, r }; n.visto = now;
+            if (typeof hp === "number" && hp !== n.hp) { n.hp = hp; aggiornaBarraVita(n); }
           }
         }
         function netFrame(dt) {
@@ -5724,9 +5767,13 @@ function aggiornaSpeciali(dt){
             a.g.rotation.y = a.t.yaw + Math.PI;
           });
           if (!room) return;
-          tNet -= dt;
-          if (tNet <= 0) { tNet = 0.1; room.presence({ x: +player.x.toFixed(2), z: +player.z.toFixed(2), yaw: +player.yaw.toFixed(2), hp: salute }); }
-
+          tNet -= dt; tNet2 -= dt;
+          if (netHost() && tNet2 <= 0) {
+            tNet2 = 0.12;
+            room.emit("pos", { w: wave, z: zonaSbloccata, i: waveIntermission ? 1 : 0,
+              e: nemici.filter((n) => !n.morto && n.uid).slice(0, 40).map((n) => [n.uid, +n.g.position.x.toFixed(1), +n.g.position.z.toFixed(1), +n.g.rotation.y.toFixed(2), (n.elite ? "e:" : "") + n.tipo, Math.round(n.hp)]) });
+          }
+          if (tNet <= 0) { tNet = 0.08; room.presence({ t0: T0, x: +player.x.toFixed(2), z: +player.z.toFixed(2), yaw: +player.yaw.toFixed(2), hp: netDown ? 0 : salute }); }
         }
 
         // Client della stanza: gestione polling e sincronizzazione online
@@ -5738,72 +5785,40 @@ function aggiornaSpeciali(dt){
           return id;
         }
         function linkStanza(id) {
-          const u = new URL(location.href); u.search = ""; u.hash = ""; u.searchParams.set("stanza", id);
+          const u = new URL(location.href); u.search = ""; u.hash = ""; u.hash = "s-" + id;
           return u.toString();
         }
-        function apriStanza(id) {
-          const peer = idGiocatore();
-          let pres = {}, cbPeers = null, chiusa = false;
-          const handlers = {};
-          let tRoom = null, sendPres = null, sendEv = null, timer = null;
-          const peersPres = {};
-          function listaPeer() {
-            const out = [{ peer, isMe: true, presence: pres }];
-            for (const pid in peersPres) out.push({ peer: pid, isMe: false, presence: peersPres[pid] });
-            return out;
-          }
-          function firePeers() { if (cbPeers) cbPeers({ peers: listaPeer() }); }
-          function controllaPiena() {
-            if (Object.keys(peersPres).length + 1 > 4) {
-              chiusa = true;
-              try { tRoom && tRoom.leave(); } catch (e) {}
-              if (api.onFull) api.onFull();
-            }
+        function apriTrystero(id) {
+          let pres = {}, cbPeers = null, chiusa = false, tRoom = null, sendPres = null, sendEv = null, timer = null, self = null;
+          const handlers = {}, peersPres = {};
+          const listaPeer = () => { const out = [{ peer: self, isMe: true, presence: pres }]; for (const pid in peersPres) out.push({ peer: pid, isMe: false, presence: peersPres[pid] }); return out; };
+          const firePeers = () => { if (cbPeers) cbPeers({ peers: listaPeer() }); };
+          async function carica() {
+            const urls = ["https://esm.run/trystero@0.21.8/mqtt", "https://cdn.jsdelivr.net/npm/trystero@0.21.8/+esm", "https://esm.run/trystero@0.21.8/torrent"];
+            let ultimo; for (const u of urls) { try { return await import(u); } catch (e) { ultimo = e; } } throw ultimo;
           }
           async function entra() {
-            let joinRoom;
-            try {
-              ({ joinRoom } = await import("https://esm.run/trystero@0.21.8/mqtt"));
-            } catch (e) {
-              try {
-                ({ joinRoom } = await import("https://esm.run/trystero@0.21.8"));
-              } catch (e2) {
-                ({ joinRoom } = await import("https://cdn.jsdelivr.net/npm/trystero@0.21.8/dist/trystero-mqtt.min.js"));
-              }
-            }
-            tRoom = joinRoom({ appId: "cripta-doom-arena" }, id);
-            const [sp, , onP] = tRoom.makeAction("pres");
-            const [se, , onE] = tRoom.makeAction("ev");
+            const mod = await carica();
+            self = mod.selfId; api.peer = self;
+            tRoom = mod.joinRoom({ appId: "cripta-doom-arena" }, id);
+            const [sp, gp] = tRoom.makeAction("pres"), [se, ge] = tRoom.makeAction("ev");
             sendPres = sp; sendEv = se;
-            onP((p, pid) => { peersPres[pid] = p || {}; firePeers(); });
-            onE((msg, pid) => {
-              const m = msg || {};
-              (handlers[m.type] || []).forEach((h) => h({ data: m.data, from: pid, isMe: false }));
-            });
-            tRoom.onPeerJoin = (pid) => { peersPres[pid] = {}; sendPres(pres, pid); firePeers(); controllaPiena();
-            try { for (const n of nemici) if (n.uid && !n.morto) sendEv({ type: "spawn", data: { u: n.uid, t: (n.elite ? "e:" : "") + n.tipo, x: n.g.position.x, z: n.g.position.z } }, pid); } catch (e) {} };
-            tRoom.onPeerLeave = (pid) => { delete peersPres[pid]; firePeers(); };
-            if (Object.keys(tRoom.getPeers()).length + 1 > 4) {
-              const e = new Error("piena"); e.piena = true;
-              try { tRoom.leave(); } catch (err) {}
-              throw e;
-            }
-            sendPres(pres);
+            gp((p, pid) => { peersPres[pid] = p || {}; firePeers(); });
+            ge((msg, pid) => { const m = msg || {}; (handlers[m.type] || []).forEach((h) => h({ data: m.data, from: pid })); });
+            tRoom.onPeerJoin((pid) => { peersPres[pid] = peersPres[pid] || {}; try { sendPres(pres, pid); } catch (e) {} firePeers(); });
+            tRoom.onPeerLeave((pid) => { delete peersPres[pid]; firePeers(); });
+            try { sendPres(pres); } catch (e) {}
             firePeers();
-            timer = setInterval(() => { if (chiusa) { clearInterval(timer); return; } sendPres(pres); firePeers(); }, 1000);
+            timer = setInterval(() => { if (!chiusa) { try { sendPres(pres); } catch (e) {} firePeers(); } }, 1000);
           }
           const api = {
-            id, peer, onFull: null,
+            id, peer: null, onFull: null,
             peerCount() { return Object.keys(peersPres).length; },
-            presence(p) { pres = p; if (sendPres && !chiusa) sendPres(pres); },
+            presence(p) { pres = p; if (sendPres && !chiusa) { try { sendPres(pres); } catch (e) {} } },
             onPeers(cb) { cbPeers = cb; },
             on(tipo, h) { (handlers[tipo] = handlers[tipo] || []).push(h); },
-            emit(type, data) { if (sendEv && !chiusa) sendEv({ type, data }); },
-            chiudi() {
-              chiusa = true;
-              if (timer) clearInterval(timer);
-              try { tRoom && tRoom.leave(); } catch (e) {}
-            },
+            emit(type, data) { if (sendEv && !chiusa) { try { sendEv({ type, data }); } catch (e) {} } },
+            chiudi() { chiusa = true; if (timer) clearInterval(timer); try { tRoom && tRoom.leave(); } catch (e) {} },
             entra,
           };
           return api;
@@ -5813,68 +5828,83 @@ function aggiornaSpeciali(dt){
           $("crea-stanza").hidden = !!room;
           $("stanza-box").hidden = !room;
           if (room) {
-            $("stanza-info").textContent = `STANZA ${room.id.toUpperCase()} · ${(room.peerCount ? room.peerCount() : altri.size) + 1}/4 GIOCATORI`;
+            $("stanza-info").textContent = `STANZA ${room.id.toUpperCase()} · ${(room.peerCount ? room.peerCount() : altri.size) + 1}/4 GIOCATORI` + (netHost() ? " · SEI L'HOST" : "");
             $("stanza-link").value = linkStanza(room.id);
           }
           if (msgErrore) $("msg").innerHTML = msgErrore;
         }
 
+        async function apriClaude(id) {
+          const cl = window.claude && window.claude.use ? await window.claude.use("room") : null;
+          if (!cl) return null;
+          const nr = await cl.join("cripta-" + id);
+          let cb = null;
+          nr.onPeers((c) => { if (cb) cb({ peers: c.peers }); });
+          return { id, peer: null, onFull: null, peerCount() { return Math.max(0, nr.peers().length - 1); },
+            presence(p) { nr.presence(p).catch(() => {}); }, onPeers(f) { cb = f; f({ peers: nr.peers() }); },
+            on(t, h) { nr.on(t, (m) => { if (!m.isMe) h({ data: m.data, from: m.peer }); }); },
+            emit(t, d) { nr.emit(t, d).catch(() => {}); }, chiudi() { nr.leave().catch(() => {}); }, async entra() {} };
+        }
+        async function apriStanza(id) { try { const c = await apriClaude(id); if (c) return c; } catch (e) {} return apriTrystero(id); }
+        function estraiCodice(s) { const m = String(s || "").trim().match(/(?:#s-|stanza=)?([a-z0-9]{4,16})\s*$/i); return m ? m[1].toLowerCase() : null; }
         async function entraInStanza(id) {
           if (room) return;
-          const r = apriStanza(id);
-          $("crea-stanza").disabled = true;
-          try {
-            await r.entra();
-          } catch (e) {
-            $("crea-stanza").disabled = false;
-            history.replaceState(null, "", location.pathname);
-            aggiornaUiStanza(e.piena ? "<b>La stanza è piena</b> (massimo 4 giocatori). Creane una nuova o gioca da solo." : "Impossibile collegarsi alla stanza. Riprova più tardi.");
-            return;
-          }
-          $("crea-stanza").disabled = false;
-          room = r; miaPeer = r.peer;
-          r.onFull = () => esciDaStanza("Sei stato disconnesso: la stanza è piena.");
-          history.replaceState(null, "", linkStanza(id));
+          if (!id || !ID_STANZA.test(id)) { aggiornaUiStanza("Codice stanza non valido."); return; }
+          id = id.toLowerCase();
+          $("crea-stanza").disabled = true; $("entra-stanza").disabled = true;
+          let r;
+          try { r = await apriStanza(id); await r.entra(); }
+          catch (e) { $("crea-stanza").disabled = false; $("entra-stanza").disabled = false; aggiornaUiStanza(e && e.piena ? "<b>La stanza è piena</b> (massimo 4 giocatori)." : "Impossibile collegarsi alla stanza. Riprova più tardi."); return; }
+          $("crea-stanza").disabled = false; $("entra-stanza").disabled = false;
+          room = r; miaPeer = r.peer; hostId = null;
+          try { history.replaceState(null, "", linkStanza(id)); } catch (e) {}
+          room.presence({ t0: T0, x: +player.x.toFixed(2), z: +player.z.toFixed(2), yaw: 0, hp: salute });
           room.onPeers((c) => { syncPeers(c.peers); aggiornaUiStanza(); });
           room.on("hit", (m) => {
             const d = m.data || {};
-            if (d.to !== miaPeer || stato !== "play") return;
+            if (d.to !== miaPeer || stato !== "play" || netDown) return;
             subisciDanno(d.d); sDanno(); shakeIntensity = 0.4; hitTimer = 0.4; aggiornaHud();
             $("hurt").style.opacity = 0.6; setTimeout(() => ($("hurt").style.opacity = 0), 150);
-            if (salute <= 0) morteOnline(d.by);
+            if (salute <= 0) netCaduto();
           });
-          room.on("pausa", () => { if (stato === "play") { pausaSync = true; pausa(); pausaSync = false; } });
-          room.on("boss", () => { for (const n of [...nemici]) if (n.tipo === "boss" && !n.morto) { n.hp = 0; esplodiNemico(n); } });
-          room.on("spawn", (m) => { const d = m.data || {}; if (!d.u || nemici.some((n) => n.uid === d.u)) return; const n = generaNemicoDiTipo(d.t); if (!n) return; n.sync = true; n.uid = d.u; n.g.position.set(d.x, 0, d.z); n.sync = false; });
-          room.on("dmg", (m) => { const d = m.data || {}; const n = nemici.find((x) => x.uid === d.u); if (n && !n.morto) { n.sync = true; applicaDannoMostro(n, d.d); n.sync = false; } });
-          room.on("die", (m) => { const d = m.data || {}; const n = nemici.find((x) => x.uid === d.u); if (n && !n.morto) { n.sync = true; esplodiNemico(n); n.sync = false; } });
-          room.on("kill", (m) => { const d = m.data || {}; if (d.by === miaPeer) { score += 100; aggiornaHud(); mostraBanner("ELIMINAZIONE", "+100 punti", 1.8); } });
+          room.on("pos", (m) => { if (!netHost() && m.from === hostId) netRiceviPos(m.data); });
+          room.on("dmg", (m) => { const d = m.data || {}; if (!netHost()) return; const n = nemici.find((x) => x.uid === d.u); if (n && !n.morto && typeof d.d === "number") { n.sync = true; applicaDannoMostro(n, Math.min(d.d, 200)); n.sync = false; } });
+          room.on("die", (m) => { const d = m.data || {}; if (netHost() || m.from !== hostId) return; const n = nemici.find((x) => x.uid === d.u); if (n && !n.morto) { n.sync = true; esplodiNemico(n); } });
+          room.on("wstart", (m) => { const d = m.data || {}; if (netHost() || m.from !== hostId || typeof d.n !== "number") return; iniziaOndata(d.n); waveQueue = []; });
+          room.on("wend", (m) => {
+            const d = m.data || {}; if (netHost() || m.from !== hostId) return;
+            waveIntermission = true; waveTimer = 6;
+            if (d.w < 9) {
+              zonaSbloccata = d.w;
+              const dest = [[0,0],[45,18],[56,18],[24,23],[28,34],[28,44],[28,54],[28,64],[28,75]][d.w];
+              player.x = centro(dest[0]) + (netRank - 1.5) * 0.8; player.z = centro(dest[1]); player.yaw = 0; player.pitch = 0;
+              palleFuoco.forEach((p) => scene.remove(p.mesh)); palleFuoco.length = 0; calcolaBfs();
+            }
+            const bonus = 50 + d.w * 15; score += bonus; aggiornaHud();
+            mostraBanner(`ONDATA ${d.w} COMPLETATA`, `Bonus: +${bonus}`, 3);
+          });
           room.on("shot", (m) => { const d = m.data || {}; if (typeof d.x === "number") sSparoLontano(Math.hypot(d.x - player.x, d.z - player.z)); });
-          netHud(); aggiornaUiStanza();
+          aggiornaUiStanza();
         }
-
         function esciDaStanza(msg) {
           if (!room) return;
-          room.chiudi(); room = null;
+          netRipristina(); room.chiudi(); room = null; hostId = null; miaPeer = null; netDown = false;
           for (const a of altri.values()) scene.remove(a.g);
           altri.clear();
-          history.replaceState(null, "", location.pathname);
-          netHud(); aggiornaUiStanza(msg);
+          try { history.replaceState(null, "", location.pathname); } catch (e) {}
+          aggiornaUiStanza(msg);
         }
-
-        $("crea-stanza").addEventListener("click", () => entraInStanza(nuovoId(6)));
+        $("crea-stanza").addEventListener("click", () => entraInStanza(nuovoId(5)));
+        $("entra-stanza").addEventListener("click", () => entraInStanza(estraiCodice($("codice-stanza").value)));
         $("esci-stanza").addEventListener("click", () => esciDaStanza());
-        $("copia-link").addEventListener("click", async () => {
-          const inp = $("stanza-link");
-          try { await navigator.clipboard.writeText(inp.value); } catch (e) { inp.select(); document.execCommand("copy"); }
-          $("copia-link").textContent = "COPIATO!";
-          setTimeout(() => ($("copia-link").textContent = "COPIA LINK"), 1500);
-        });
+        $("copia-link").addEventListener("click", () => { const i = $("stanza-link"); i.select(); try { navigator.clipboard.writeText(i.value); } catch (e) { document.execCommand("copy"); } });
+        { const m = /^#s-([a-z0-9]{4,16})$/i.exec(location.hash); if (m) entraInStanza(m[1]); }
+
         addEventListener("pagehide", () => room && room.chiudi());
 
         netHud();
-        const stanzaUrl = new URLSearchParams(location.search).get("stanza");
-        if (stanzaUrl && ID_STANZA.test(stanzaUrl)) entraInStanza(stanzaUrl);
+        
+        
 
         reset();
         calcolaBfs();
@@ -5901,4 +5931,4 @@ window.addEventListener('DOMContentLoaded',()=>{
  const ammo=document.getElementById('ammo');if(ammo)new MutationObserver(update).observe(ammo,{childList:true,characterData:true,subtree:true});update();
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a535550d99c85a43',t:'MTc5MzQ3NzczMQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a535550d99c85a43',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53a5dcc3f7659a1',t:'MTc5MzUzMDUxOA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53a5dcc3f7659a1',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53b2b701e07c536',t:'MTc5MzUzODk0MQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53b2b701e07c536',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53cb2a2cb0cee61',t:'MTc5MzU1NDk2NA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53cb2a2cb0cee61',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53cc2784a7fedcb',t:'MTc5MzU1NTYxMw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53cc2784a7fedcb',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53d251f8dffe3b2',t:'MTc5MzU1OTY1NA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53d251f8dffe3b2',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body></html>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a535550d99c85a43',t:'MTc5MzQ3NzczMQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a535550d99c85a43',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53a5dcc3f7659a1',t:'MTc5MzUzMDUxOA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53a5dcc3f7659a1',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53b2b701e07c536',t:'MTc5MzUzODk0MQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53b2b701e07c536',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53cb2a2cb0cee61',t:'MTc5MzU1NDk2NA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53cb2a2cb0cee61',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53cc2784a7fedcb',t:'MTc5MzU1NTYxMw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53cc2784a7fedcb',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53d309ade714be7',t:'MTc5MzU2MDEyNA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53d309ade714be7',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body></html>
